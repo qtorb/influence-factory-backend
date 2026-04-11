@@ -1,51 +1,28 @@
 {
   "name": "influence-factory-backend",
   "version": "1.0.0",
-  "description": "Multi-tenant SaaS platform for AI-powered content generation with WordPress integration",
+  "description": "Multi-tenant SaaS platform for AI-powered content generation",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "migrate": "prisma migrate deploy",
-    "migrate:dev": "prisma migrate dev",
-    "test": "vitest",
-    "lint": "eslint src --ext .ts"
+    "dev": "tsx watch src/index.ts"
   },
-  "keywords": [
-    "saas",
-    "content-generation",
-    "wordpress",
-    "ai",
-    "multi-tenant"
-  ],
   "author": "Albert",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.28.0",
-    "@prisma/client": "^5.8.0",
-    "bull": "^4.12.2",
-    "cors": "^2.8.5",
-    "crypto": "^1.0.1",
-    "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "jsonwebtoken": "^9.1.2",
-    "openai": "^4.40.0",
-    "redis": "^4.6.13",
-    "uuid": "^9.0.1"
+    "dotenv": "^16.3.1",
+    "@prisma/client": "^5.8.0",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.10.6",
-    "@typescript-eslint/eslint-plugin": "^6.17.0",
-    "@typescript-eslint/parser": "^6.17.0",
-    "eslint": "^8.56.0",
-    "prisma": "^5.8.0",
-    "tsx": "^4.7.0",
     "typescript": "^5.3.3",
-    "vitest": "^1.1.0"
+    "prisma": "^5.8.0",
+    "tsx": "^4.7.0"
   },
   "engines": {
     "node": ">=18.0.0"
