@@ -5,6 +5,16 @@ import { PrismaClient } from '@prisma/client';
 import { createClient } from 'redis';
 import { v4 as uuidv4 } from 'uuid';
 import { validateSources, isValidSourceUrl } from './validators';
+import {
+  buildPostSystemPrompt,
+  buildUserPrompt,
+  parseClaudeResponse,
+  validateParsedPost,
+  buildGenerationResponse,
+  countWords,
+  getWordCountCategory,
+  ContentGenerationRequest,
+} from './content-generator';
 
 dotenv.config();
 const prisma = new PrismaClient();
@@ -225,6 +235,149 @@ app.post('/api/v1/validate-source', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error validating sources:', error);
     res.status(500).json({ error: 'Failed to validate sources', details: error.message });
+  }
+});
+
+// ============================================================================
+// CONTENT GENERATION ENDPOINT (Claude in backend)
+// ============================================================================
+
+app.post('/api/v1/generate', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, topic, sources, keywords, authorityStrategy, style } = req.body;
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId is required' });
+    }
+
+    if (!topic || typeof topic !== 'string' || topic.trim().length === 0) {
+      return res.status(400).json({ error: 'topic is required and must be a non-empty string' });
+    }
+
+    // Validate tenant exists and check API quota
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    // Check API usage quota
+    if (tenant.apiUsageThisMonth >= tenant.apiQuotaMonthly) {
+      return res.status(429).json({
+        error: 'API quota exceeded',
+        quota: tenant.apiQuotaMonthly,
+        usage: tenant.apiUsageThisMonth,
+      });
+    }
+
+    // Verify Claude API key is configured
+    const claudeApiKey = process.env.CLAUDE_API_KEY;
+    if (!claudeApiKey) {
+      console.error('CLAUDE_API_KEY not configured');
+      return res.status(500).json({ error: 'Claude API not configured' });
+    }
+
+    // Build prompts
+    const systemPrompt = buildPostSystemPrompt(authorityStrategy || 'data-driven');
+    const userPrompt = buildUserPrompt({
+      topic: topic.trim(),
+      sources: Array.isArray(sources) ? sources.filter(s => typeof s === 'string') : [],
+      keywords: Array.isArray(keywords) ? keywords.filter(k => typeof k === 'string') : [],
+      authorityStrategy: authorityStrategy || 'data-driven',
+      style: (style as any) || 'persuasive',
+    });
+
+    // Call Claude API
+    const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeApiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-1',
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: userPrompt,
+          },
+        ],
+      }),
+    });
+
+    if (!claudeResponse.ok) {
+      const errorData: any = await claudeResponse.json();
+      console.error('Claude API error:', errorData);
+      return res.status(503).json({
+        error: 'Claude API request failed',
+        details: errorData?.error?.message || 'Unknown error',
+      });
+    }
+
+    const claudeData: any = await claudeResponse.json();
+    const generatedText = claudeData.content[0]?.text || '';
+
+    // Parse Claude response
+    let parsedPost;
+    try {
+      parsedPost = parseClaudeResponse(generatedText);
+    } catch (parseError) {
+      const errorMsg = parseError instanceof Error ? parseError.message : 'Unknown error';
+      console.error('Parse error:', parseError);
+      return res.status(400).json({
+        error: 'Failed to parse generated content',
+        details: errorMsg,
+      });
+    }
+
+    // Validate parsed post
+    const validation = validateParsedPost(parsedPost);
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: 'Generated content validation failed',
+        errors: validation.errors,
+      });
+    }
+
+    // Increment API usage
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        apiUsageThisMonth: tenant.apiUsageThisMonth + 1,
+      },
+    });
+
+    // Build response
+    const generatedContent = buildGenerationResponse(
+      parsedPost,
+      generatedText,
+      claudeData.usage?.output_tokens
+    );
+
+    const wordCount = countWords(parsedPost.body);
+    const wordCategory = getWordCountCategory(wordCount);
+
+    res.status(200).json({
+      success: true,
+      content: generatedContent,
+      metadata: {
+        wordCount,
+        wordCategory,
+        tokensUsed: claudeData.usage,
+        topicRequested: topic,
+        authorityStrategy: authorityStrategy || 'data-driven',
+      },
+    });
+  } catch (error: any) {
+    console.error('Error generating content:', error);
+    res.status(500).json({
+      error: 'Failed to generate content',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
   }
 });
 
