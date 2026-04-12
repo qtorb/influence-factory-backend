@@ -210,22 +210,59 @@ process.on('SIGINT', gracefulShutdown);
 
 async function startServer() {
   try {
-    await prisma.$connect();
+    console.log('Starting server initialization...');
+
+    // Connect to Prisma with timeout
+    console.log('Connecting to PostgreSQL...');
+    await Promise.race([
+      prisma.$connect(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Prisma connection timeout')), 10000)
+      )
+    ]);
     console.log('✓ Connected to PostgreSQL database');
+
+    // Connect to Redis with timeout (non-blocking)
+    console.log('Attempting Redis connection...');
     try {
-      await redisClient.connect();
+      await Promise.race([
+        redisClient.connect(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
+        )
+      ]);
       console.log('✓ Connected to Redis');
     } catch (err) {
       console.warn('⚠ Redis connection failed, continuing without caching:', err);
     }
-    app.listen(PORT, () => {
+
+    const server = app.listen(PORT, () => {
       console.log(`\n╔════════════════════════════════════════╗\n║   Influence Factory Backend Server    ║\n╠════════════════════════════════════════╣\n║ Server running on port: ${String(PORT).padEnd(20)} ║\n║ Environment: ${(process.env.NODE_ENV || 'development').padEnd(26)} ║\n║ Database: PostgreSQL                   ║\n║ Cache: Redis                           ║\n╚════════════════════════════════════════╝\n      `);
     });
+
+    // Handle server errors
+    server.on('error', (err: any) => {
+      console.error('Server error:', err);
+      process.exit(1);
+    });
+
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
   }
 }
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error);
+  gracefulShutdown();
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled rejection at:', promise, 'reason:', reason);
+  gracefulShutdown();
+});
 
 startServer();
 
