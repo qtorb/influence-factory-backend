@@ -1,0 +1,217 @@
+// Influence Factory - Multi-tenant Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// MULTI-TENANT CORE
+// ============================================================================
+
+model Tenant {
+  id                String   @id @default(uuid())
+  name              String
+  email             String   @unique
+  subscriptionTier  String   @default("free") // free, starter, pro, enterprise
+  status            String   @default("active")
+  apiQuotaMonthly   Int      @default(10000)
+  apiUsageThisMonth Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  users             User[]
+  projects          Project[]
+  wordPressSites    WordPressSite[]
+  posts             Post[]
+  jobs              Job[]
+  patterns          PersonalPattern[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model User {
+  id            String   @id @default(uuid())
+  tenantId      String
+  email         String
+  name          String?
+  role          String   @default("member") // owner, admin, member
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([email])
+}
+
+// ============================================================================
+// PROJECTS & CONFIGURATION
+// ============================================================================
+
+model Project {
+  id                String   @id @default(uuid())
+  tenantId          String
+  name              String
+  description       String?
+  authorityStrategy String   @default("data-driven")
+  status            String   @default("active")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  posts             Post[]
+  wordPressSites    WordPressSite[]
+
+  @@index([tenantId])
+}
+
+model WordPressSite {
+  id                String   @id @default(uuid())
+  tenantId          String
+  projectId         String
+  url               String
+  username          String
+  appPassword       String   @db.Text // AES-256-GCM encrypted
+  status            String   @default("active")
+  lastCheckAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  posts             Post[]
+
+  @@unique([tenantId, projectId, url])
+  @@index([tenantId])
+  @@index([projectId])
+}
+
+// ============================================================================
+// CONTENT GENERATION
+// ============================================================================
+
+model Post {
+  id                String    @id @default(uuid())
+  tenantId          String
+  projectId         String
+  wordPressSiteId   String?
+  title             String
+  content           String    @db.Text
+  excerpt           String    @db.Text
+  intro             String?   @db.Text
+  body              String?   @db.Text
+  conclusion        String?   @db.Text
+  featuredImageUrl  String?
+  geoScore          Float?
+  authoritySignals  Json?     // Stored authority injection data
+  status            String    @default("draft")
+  wordPressPostId   Int?
+  wordPressUrl      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wordPressSite     WordPressSite? @relation(fields: [wordPressSiteId], references: [id], onDelete: SetNull)
+  embedding         PostEmbedding?
+  sources           Source[]
+  jobs              Job[]
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([status])
+  @@index([wordPressSiteId])
+}
+
+model PostEmbedding {
+  id        String   @id @default(uuid())
+  postId    String   @unique
+  embedding Unsupported("vector(1536)")?
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+model Source {
+  id          String   @id @default(uuid())
+  postId      String
+  url         String
+  domain      String
+  title       String?
+  authority   Float?
+  relevance   Float?
+  createdAt   DateTime @default(now())
+
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([domain])
+}
+
+// ============================================================================
+// JOB QUEUE (Bull + Redis)
+// ============================================================================
+
+model Job {
+  id              String   @id @default(uuid())
+  tenantId        String
+  postId          String?
+  type            String   // generate_post, validate_sources, publish_post, generate_image
+  status          String   @default("pending") // pending, processing, completed, failed
+  attempts        Int      @default(0)
+  maxAttempts     Int      @default(3)
+  priority        Int      @default(0)
+  progress        Float    @default(0)
+  result          Json?
+  error           String?
+  bullJobId       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  post            Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([postId])
+  @@index([status])
+  @@index([type])
+}
+
+// ============================================================================
+// PATTERNS & ANALYTICS
+// ============================================================================
+
+model PersonalPattern {
+  id                String   @id @default(uuid())
+  tenantId          String
+  patternType       String   // bias, strength, recurring_mistake
+  description       String   @db.Text
+  frequency         Int      @default(1)
+  affectedDecisions Int      @default(0)
+  recommendation    String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([patternType])
+}
+
+// ============================================================================
+// SYSTEM
+// ============================================================================
+
+model SystemMetric {
+  id                String   @i
