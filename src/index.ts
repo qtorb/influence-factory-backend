@@ -170,6 +170,221 @@ app.get('/api/v1/tenants/:tenantId/projects', async (req: Request, res: Response
   }
 });
 
+// ============================================================================
+// POSTS CRUD ENDPOINTS
+// ============================================================================
+
+// POST /api/v1/posts - Create a new post
+app.post('/api/v1/posts', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, projectId, title, content, excerpt, intro, body, conclusion, tags } = req.body;
+
+    if (!tenantId || !projectId || !title || !content || !excerpt) {
+      return res.status(400).json({
+        error: 'Missing required fields: tenantId, projectId, title, content, excerpt'
+      });
+    }
+
+    // Verify tenant exists
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    // Verify project exists and belongs to tenant
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!project || project.tenantId !== tenantId) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const post = await prisma.post.create({
+      data: {
+        id: uuidv4(),
+        tenantId,
+        projectId,
+        title,
+        content,
+        excerpt,
+        intro,
+        body,
+        conclusion,
+        status: 'draft',
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      post,
+      message: 'Post created successfully',
+    });
+  } catch (error: any) {
+    console.error('Error creating post:', error);
+    res.status(500).json({ error: 'Failed to create post', details: error.message });
+  }
+});
+
+// GET /api/v1/posts - Get all posts with optional filtering
+app.get('/api/v1/posts', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, projectId, status } = req.query;
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId query parameter is required' });
+    }
+
+    const where: any = { tenantId: tenantId as string };
+    if (projectId) where.projectId = projectId as string;
+    if (status) where.status = status as string;
+
+    const posts = await prisma.post.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        sources: true,
+        wordPressSite: true,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      count: posts.length,
+      posts,
+    });
+  } catch (error: any) {
+    console.error('Error fetching posts:', error);
+    res.status(500).json({ error: 'Failed to fetch posts', details: error.message });
+  }
+});
+
+// GET /api/v1/posts/:id - Get a specific post
+app.get('/api/v1/posts/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { tenantId } = req.query;
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId query parameter is required' });
+    }
+
+    const post = await prisma.post.findUnique({
+      where: { id },
+      include: {
+        sources: true,
+        wordPressSite: true,
+        embedding: true,
+      },
+    });
+
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    // Verify post belongs to tenant
+    if (post.tenantId !== tenantId) {
+      return res.status(403).json({ error: 'Forbidden: Post does not belong to this tenant' });
+    }
+
+    res.status(200).json({
+      success: true,
+      post,
+    });
+  } catch (error: any) {
+    console.error('Error fetching post:', error);
+    res.status(500).json({ error: 'Failed to fetch post', details: error.message });
+  }
+});
+
+// PUT /api/v1/posts/:id - Update a post
+app.put('/api/v1/posts/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { tenantId, title, content, excerpt, intro, body, conclusion, status, featuredImageUrl } = req.body;
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId is required' });
+    }
+
+    // Verify post exists and belongs to tenant
+    const existingPost = await prisma.post.findUnique({
+      where: { id },
+    });
+
+    if (!existingPost) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    if (existingPost.tenantId !== tenantId) {
+      return res.status(403).json({ error: 'Forbidden: Post does not belong to this tenant' });
+    }
+
+    const updatedPost = await prisma.post.update({
+      where: { id },
+      data: {
+        ...(title && { title }),
+        ...(content && { content }),
+        ...(excerpt && { excerpt }),
+        ...(intro && { intro }),
+        ...(body && { body }),
+        ...(conclusion && { conclusion }),
+        ...(status && { status }),
+        ...(featuredImageUrl && { featuredImageUrl }),
+        updatedAt: new Date(),
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      post: updatedPost,
+      message: 'Post updated successfully',
+    });
+  } catch (error: any) {
+    console.error('Error updating post:', error);
+    res.status(500).json({ error: 'Failed to update post', details: error.message });
+  }
+});
+
+// DELETE /api/v1/posts/:id - Delete a post
+app.delete('/api/v1/posts/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { tenantId } = req.query;
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId query parameter is required' });
+    }
+
+    // Verify post exists and belongs to tenant
+    const existingPost = await prisma.post.findUnique({
+      where: { id },
+    });
+
+    if (!existingPost) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    if (existingPost.tenantId !== tenantId) {
+      return res.status(403).json({ error: 'Forbidden: Post does not belong to this tenant' });
+    }
+
+    await prisma.post.delete({
+      where: { id },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Post deleted successfully',
+      postId: id,
+    });
+  } catch (error: any) {
+    console.error('Error deleting post:', error);
+    res.status(500).json({ error: 'Failed to delete post', details: error.message });
+  }
+});
+
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     error: 'Not Found',
