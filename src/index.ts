@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { createClient } from 'redis';
 import { v4 as uuidv4 } from 'uuid';
+import { validateSources, isValidSourceUrl } from './validators';
 
 dotenv.config();
 const prisma = new PrismaClient();
@@ -167,6 +168,63 @@ app.get('/api/v1/tenants/:tenantId/projects', async (req: Request, res: Response
   } catch (error) {
     console.error('Error fetching projects:', error);
     res.status(500).json({ error: 'Failed to fetch projects' });
+  }
+});
+
+// ============================================================================
+// SOURCE VALIDATION ENDPOINTS (replaces CORS-Anywhere)
+// ============================================================================
+
+app.post('/api/v1/validate-source', async (req: Request, res: Response) => {
+  try {
+    const { urls, tenantId } = req.body;
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId is required' });
+    }
+
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+      return res.status(400).json({ error: 'urls array is required and must not be empty' });
+    }
+
+    if (urls.length > 50) {
+      return res.status(400).json({ error: 'Maximum 50 URLs per request' });
+    }
+
+    // Validate tenant exists
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    // Filter and validate URLs
+    const validUrls = urls.filter(url => {
+      try {
+        return typeof url === 'string' && isValidSourceUrl(url);
+      } catch {
+        return false;
+      }
+    });
+
+    if (validUrls.length === 0) {
+      return res.status(400).json({ error: 'No valid URLs provided' });
+    }
+
+    // Validate sources in parallel
+    const validatedSources = await validateSources(validUrls);
+
+    res.status(200).json({
+      success: true,
+      tenantId,
+      total: validatedSources.length,
+      accessible: validatedSources.filter(s => s.accessible).length,
+      sources: validatedSources,
+    });
+  } catch (error: any) {
+    console.error('Error validating sources:', error);
+    res.status(500).json({ error: 'Failed to validate sources', details: error.message });
   }
 });
 
