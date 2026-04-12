@@ -27,11 +27,32 @@ redisClient.on('error', (err) => console.error('Redis error:', err));
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
 
+// CORS SOBERANO - Solo autorizar familia de servicios
+const ALLOWED_ORIGINS = [
+  process.env.FRONTEND_URL || 'http://localhost:3000',
+  'https://influence-factory-frontend-production.up.railway.app',
+  'http://localhost:3000',
+  'http://localhost:5173', // Vite dev
+];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Permitir requests sin origin (curl, postman, etc for testing)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked: ${origin}`);
+      callback(new Error('CORS not allowed'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400, // 24 horas
 }));
 
 app.use(express.json({ limit: '50mb' }));
