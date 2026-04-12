@@ -11,9 +11,12 @@ import {
   parseClaudeResponse,
   validateParsedPost,
   buildGenerationResponse,
+  buildJSONLDMetadata,
   countWords,
   getWordCountCategory,
   ContentGenerationRequest,
+  ValidatedSource,
+  JSONLDMetadata,
 } from './content-generator';
 
 dotenv.config();
@@ -265,7 +268,7 @@ app.post('/api/v1/validate-source', async (req: Request, res: Response) => {
 
 app.post('/api/v1/generate', async (req: Request, res: Response) => {
   try {
-    const { tenantId, topic, sources, keywords, authorityStrategy, style } = req.body;
+    const { tenantId, topic, sources, validatedSources, keywords, authorityStrategy, style } = req.body;
 
     if (!tenantId) {
       return res.status(400).json({ error: 'tenantId is required' });
@@ -299,11 +302,17 @@ app.post('/api/v1/generate', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Claude API not configured' });
     }
 
+    // MEJORA 1: Procesar validatedSources para citation anchoring
+    const validatedSourcesArray = Array.isArray(validatedSources)
+      ? (validatedSources as ValidatedSource[]).filter(s => s && s.url)
+      : [];
+
     // Build prompts
     const systemPrompt = buildPostSystemPrompt(authorityStrategy || 'data-driven');
     const userPrompt = buildUserPrompt({
       topic: topic.trim(),
       sources: Array.isArray(sources) ? sources.filter(s => typeof s === 'string') : [],
+      validatedSources: validatedSourcesArray,  // MEJORA: Pasar fuentes validadas
       keywords: Array.isArray(keywords) ? keywords.filter(k => typeof k === 'string') : [],
       authorityStrategy: authorityStrategy || 'data-driven',
       style: (style as any) || 'persuasive',
@@ -372,25 +381,56 @@ app.post('/api/v1/generate', async (req: Request, res: Response) => {
       },
     });
 
-    // Build response
-    const generatedContent = buildGenerationResponse(
+    // Build response with JSON-LD metadata (MEJORA: Citation Anchoring)
+    const { content: generatedContent, metadata: jsonldMetadata } = buildGenerationResponse(
       parsedPost,
       generatedText,
+      validatedSourcesArray,  // MEJORA: Pasar validatedSources para citation anchoring
       claudeData.usage?.output_tokens
     );
 
     const wordCount = countWords(parsedPost.body);
     const wordCategory = getWordCountCategory(wordCount);
 
-    res.status(200).json({
+    // MEJORA 2: Incluir JSON-LD en consola para validación del frontend
+    console.log('\n═══════════════════════════════════════════════════════════');
+    console.log('📊 GENERACIÓN COMPLETADA - METADATOS JSON-LD');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('Respuesta completa:', JSON.stringify({
       success: true,
       content: generatedContent,
+      metadata: {
+        ...jsonldMetadata,
+        wordCount,
+        wordCategory,
+        tokensUsed: claudeData.usage,
+        topicRequested: topic,
+        authorityStrategy: authorityStrategy || 'data-driven',
+      },
+    }, null, 2));
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('✅ Metadatos presentes:', !!jsonldMetadata);
+    console.log('@type:', jsonldMetadata['@type']);
+    console.log('@context:', jsonldMetadata['@context']);
+    console.log('Citations (Anclaje):', jsonldMetadata.citation);
+    console.log('═══════════════════════════════════════════════════════════\n');
+
+    res.status(200).json({
+      success: true,
+      content: {
+        ...generatedContent,
+        ...jsonldMetadata,  // MEJORA: Incluir metadatos JSON-LD en la respuesta
+      },
       metadata: {
         wordCount,
         wordCategory,
         tokensUsed: claudeData.usage,
         topicRequested: topic,
         authorityStrategy: authorityStrategy || 'data-driven',
+        citationAnchoring: {
+          validatedSources: validatedSourcesArray.length,
+          anchored: jsonldMetadata.citation.length,
+        },
       },
     });
   } catch (error: any) {
