@@ -12,7 +12,7 @@
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "seed": "tsx prisma/seed.ts",
-    "start": "serve -s dist -l $PORT",
+    "start": "node frontend-server.js",
     "start:backend": "node dist/index.js",
     "start:frontend": "node static-server.js",
     "dev": "npm run build:backend && node dist/index.js",
