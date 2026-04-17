@@ -16,9 +16,27 @@
 
 import React, { useState, useEffect } from 'react';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'https://influence-factory-backend-production.up.railway.app')
-  .replace(/\/api\/?$/, '')   // evita doble /api/ si VITE_API_URL ya incluye /api
-  .replace(/\/$/, '');        // elimina trailing slash
+const PRODUCTION_API_ORIGIN = 'https://influence-factory-backend-production.up.railway.app';
+
+const normalizeApiBase = (rawApiUrl?: string) => {
+  const candidate = (rawApiUrl || PRODUCTION_API_ORIGIN).trim() || PRODUCTION_API_ORIGIN;
+
+  return candidate
+    .replace(/\/+$/, '')
+    .replace(/\/api(?:\/v\d+)?$/i, '');
+};
+
+const API_BASE = normalizeApiBase(import.meta.env.VITE_API_URL);
+
+const buildApiV1Url = (endpoint: string) => {
+  const sanitizedEndpoint = endpoint
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/^api\/v\d+\//i, '')
+    .replace(/^api\//i, '');
+
+  return `${API_BASE}/api/v1/${sanitizedEndpoint}`;
+};
 const TENANT_ID = 'influence-factory-demo';
 
 // ============================================================================
@@ -141,7 +159,7 @@ const ControlTowerBridges: React.FC = () => {
       setNichesError('');
       // TODO: Implementar endpoint para cargar nichos
       // Por ahora simulamos cargando el nicho por defecto
-      // const response = await fetch(`${API_BASE}/api/v1/niches`);
+      // const response = await fetch(buildApiV1Url('niches'));
       // const data = await response.json();
       // setNiches(data.niches);
       // setSelectedProject(data.niches[0]);
@@ -192,7 +210,7 @@ const ControlTowerBridges: React.FC = () => {
 
       console.log('🚀 Validando URLs:', urls);
 
-      const response = await fetch(`${API_BASE}/api/v1/validate-sources`, {
+      const response = await fetch(buildApiV1Url('validate-sources'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -248,7 +266,7 @@ const ControlTowerBridges: React.FC = () => {
       console.log('Tema:', topic);
       console.log('Proyecto:', selectedProject.name);
 
-      const response = await fetch(`${API_BASE}/api/v1/generate`, {
+      const response = await fetch(buildApiV1Url('generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
