@@ -209,8 +209,10 @@ const ControlTowerBridges: React.FC = () => {
       }
 
       console.log('🚀 Validando URLs:', urls);
+      const finalUrl = buildApiV1Url('validate-sources');
+      console.log('Llamando a:', finalUrl);
 
-      const response = await fetch(buildApiV1Url('validate-sources'), {
+      const response = await fetch(finalUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -265,8 +267,10 @@ const ControlTowerBridges: React.FC = () => {
       console.log('🚀 Generando contenido multidimensional...');
       console.log('Tema:', topic);
       console.log('Proyecto:', selectedProject.name);
+      const finalUrl = buildApiV1Url('generate');
+      console.log('Llamando a:', finalUrl);
 
-      const response = await fetch(buildApiV1Url('generate'), {
+      const response = await fetch(finalUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

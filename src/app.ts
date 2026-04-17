@@ -6,6 +6,12 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 // ── Rutas de diagnóstico (antes de cualquier router complejo) ──────────────
 app.get('/test-simple', (_req, res) => res.send('Ruta simple funciona ✅'));
 app.get('/', (_req, res) => res.status(200).send('Fábrica Online ✅'));
@@ -17,32 +23,6 @@ app.get('/health', (_req, res) => {
   });
 });
 // ──────────────────────────────────────────────────────────────────────────
-
-const configuredOrigins = env.frontendUrl
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter((origin) => origin.length > 0);
-const allowAnyOrigin = configuredOrigins.includes('*');
-const devOrigins = ['http://localhost:3000', 'http://localhost:5173'];
-const ALLOWED_ORIGINS = env.nodeEnv === 'production'
-  ? configuredOrigins
-  : [...configuredOrigins, ...devOrigins];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) {
-      return callback(null, true);
-    }
-    if (allowAnyOrigin || ALLOWED_ORIGINS.includes(origin)) {
-      return callback(null, true);
-    }
-    callback(new Error('CORS origin not allowed'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  maxAge: 86400,
-}));
 
 app.use((req, res, next) => {
   req.setTimeout(300000);
