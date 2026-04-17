@@ -16,7 +16,9 @@
 
 import React, { useState, useEffect } from 'react';
 
-const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_URL || 'https://influence-factory-backend-production.up.railway.app')
+  .replace(/\/api\/?$/, '')   // evita doble /api/ si VITE_API_URL ya incluye /api
+  .replace(/\/$/, '');        // elimina trailing slash
 const TENANT_ID = 'influence-factory-demo';
 
 // ============================================================================
