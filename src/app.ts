@@ -44,6 +44,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 
 app.use('/api/v1', apiRouter);
+console.log('✅ Rutas /api/v1 cargadas correctamente');
+
+// Ruta raíz de diagnóstico — confirma que Express está vivo
+app.get('/', (_req, res) => {
+  res.status(200).send('Fábrica Online ✅');
+});
 
 app.get('/health', (_req, res) => {
   res.status(200).json({

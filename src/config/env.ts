@@ -2,10 +2,12 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Warn at startup instead of crashing — lets routes register even with incomplete env
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    console.warn(`⚠️  Missing environment variable: ${name}. Some endpoints may not work.`);
+    return '';
   }
   return value;
 }
