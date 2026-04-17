@@ -14,7 +14,7 @@ function getRequiredEnv(name: string): string {
 
 export const env = {
   port: Number(process.env.PORT ?? 3001),
-  frontendUrl: process.env.FRONTEND_URL ?? '*',
+  frontendUrl: process.env.FRONTEND_URL ?? 'https://influence-factory-frontend-production.up.railway.app',
   redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
   databaseUrl: getRequiredEnv('DATABASE_URL'),
   claudeApiKey: getRequiredEnv('CLAUDE_API_KEY'),
