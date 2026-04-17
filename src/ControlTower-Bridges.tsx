@@ -1,5 +1,4 @@
 /**
- * DEPLOY FINGERPRINT: 2026-04-17 18:45 UTC
  * INFLUENCE FACTORY - Control Tower (Agnóstico Multi-Nicho)
  * Arquitectura:
  * - Selector dinámico de Proyectos/Nichos
@@ -308,7 +307,7 @@ const ControlTowerBridges: React.FC = () => {
         }}
       >
         <h1 style={{ fontSize: '28px', fontWeight: 'bold', margin: 0 }}>
-          ⚡ INFLUENCE FACTORY - Control Tower 🚀
+          ⚡ INFLUENCE FACTORY - Control Tower
         </h1>
         <p style={{ fontSize: '14px', color: '#a1a1a6', marginTop: '8px' }}>
           Sistema Agnóstico Multi-Nicho • Generación Multidimensional de Autoridad
