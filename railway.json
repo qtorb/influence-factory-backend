@@ -1,20 +1,12 @@
 {
-  "services": [
-    {
-      "name": "frontend",
-      "startCommand": "node frontend-server.js",
-      "buildCommand": "npm run build",
-      "installCommand": "npm install",
-      "port": 3000,
-      "envPrefix": "FRONTEND_"
-    },
-    {
-      "name": "backend",
-      "startCommand": "npm start",
-      "buildCommand": "npm run build:backend",
-      "installCommand": "npm install",
-      "port": 3001,
-      "envPrefix": "BACKEND_"
-    }
-  ]
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm run build"
+  },
+  "deploy": {
+    "startCommand": "node frontend-server.js",
+    "healthcheckPath": "/",
+    "restartPolicyType": "ON_FAILURE"
+  }
 }
