@@ -24,6 +24,48 @@ export interface ContentGenerationRequest {
   style?: 'formal' | 'conversational' | 'persuasive';
 }
 
+// NEW: Tweet structure para X
+export interface XThreadTweet {
+  order: number;
+  content: string;
+}
+
+// NEW: LinkedIn post structure
+export interface LinkedInPost {
+  content: string;
+  bullets: string[];
+}
+
+// NEW: Social media kit
+export interface SocialKit {
+  xThread: XThreadTweet[];
+  linkedInPost: LinkedInPost;
+}
+
+// NEW: Key takeaway para LLMs
+export interface KeyTakeaway {
+  title: string;
+  description: string;
+}
+
+// NEW: Metadata geography
+export interface MetadataGEO {
+  jsonLD: JSONLDMetadata;
+  keyTakeaways: KeyTakeaway[];
+}
+
+// NEW: Multidimensional article output
+export interface MultidimensionalArticle {
+  article: {
+    title: string;
+    markdownContent: string;
+    excerpt: string;
+    slug: string;
+  };
+  socialKit: SocialKit;
+  metadataGEO: MetadataGEO;
+}
+
 export interface ParsedPost {
   title: string;
   metaDescription: string;
@@ -66,106 +108,264 @@ export interface GeneratedContent {
 }
 
 /**
- * Construir el prompt del sistema para Claude
- * Encapsula la estrategia de prompting + RAG Optimization
- *
- * RAG OPTIMIZATION: Se fuerza estructura H2/H3 con densidad semántica
- * para que sistemas RAG (Retrieval-Augmented Generation) indexen correctamente
+ * Construir el master prompt del sistema para Claude
+ * Integra: estrategia de prompting, RAG optimization, authority persona y base prompt
  */
-export function buildPostSystemPrompt(strategy: string = 'data-driven'): string {
-  return `You are an expert content strategist and SEO specialist creating compelling, data-driven blog posts optimized for AI indexing. Your role is to:
+export function buildPostSystemPrompt(
+  strategy: string = 'data-driven',
+  authorityPersona?: string,
+  promptBase?: string
+): string {
+  const defaultPersona = authorityPersona || 'Expert content strategist with 10+ years of experience in strategic communication and thought leadership';
+  const defaultPrompt = promptBase || 'Create content that establishes authority, demonstrates expertise, and drives measurable impact across multiple channels';
 
-1. **Authority Injection**: Build credibility by referencing authoritative sources and research
-2. **Structure Excellence**: Create posts with CLEAR H2 main sections and H3 subsections for RAG compatibility
-3. **Semantic Density**: After each H2, include 2-3 sentences with high keyword density for AI scrapers
-4. **SEO Optimization**: Naturally incorporate keywords while maintaining readability
-5. **RAG-Friendly Format**: Ensure structure can be easily parsed by Retrieval-Augmented Generation systems
-6. **Engagement**: Write compelling introductions and conclusions that drive action
-7. **Compliance**: Follow all formatting rules precisely
+  return `You are an expert content creator building multidimensional content for humans and AI indexing systems.
 
-## Output Format Rules:
-- Title: Maximum 68 characters, compelling and clear
-- Meta Description: Maximum 155 characters, includes call-to-action
-- Body: 650-920 words, formatted in Markdown with:
-  * EXACTLY 3-4 H2 sections (main topics)
-  * Each H2 followed by 2-3 introductory sentences with keywords
-  * 1-2 H3 subsections per H2
-  * Paragraph density: 100-150 words per section
-- Tags: 4-6 lowercase, relevant tags separated by commas
-- Image Prompt: One-line English description for ${strategy === 'visual-heavy' ? 'DALL-E' : 'image generation'}
+## YOUR PERSONA
+${defaultPersona}
 
-## RAG-Optimized Structure:
-${strategy === 'data-driven' ?
-`- Section 1 (H2): "Introduction to [Topic]" + semantic density
-- Section 2 (H2): "Key Data & Research" with H3 subsections
-- Section 3 (H2): "Strategic Implementation" with H3 subsections
-- Section 4 (H2): "Conclusion & Impact"
-- Each section MUST have keyword-rich opening paragraph for RAG indexing`
-:
-`- Build narrative flow with clear H2 transitions
-- Use H3 for example grouping
-- Maintain consistent paragraph structure`}
+## CORE DIRECTIVE
+${defaultPrompt}
 
-## Content Strategy:
-Authority Strategy: ${strategy === 'data-driven' ? 'Cite specific data, research, and authoritative sources to build credibility. Include source attribution where relevant.' : 'Focus on storytelling and practical examples'}
+## TECHNICAL REQUIREMENTS
+1. Semantic Consistency: Same semantic fingerprint in JSON-LD, article, and social content
+2. Authority Injection: Reference authoritative sources to build credibility
+3. Multi-Format Optimization: Content works for humans, LLM indexers, and social platforms
+4. RAG-Friendly Structure: H2 main sections with H3 subsections
+5. LLM-Extractable Data: JSON-LD enables external LLMs to cite your content
+6. Social Virality: X threads and LinkedIn posts for algorithmic distribution
+7. Snippet Optimization: Key takeaways for AI-generated snippets
 
-## Writing Style:
-- Be concise but comprehensive
-- Use active voice
-- Include transition words between sections
-- Provide actionable insights
-- End with a clear call-to-action
-- CRITICAL: Ensure RAG systems can parse structure (H2/H3 hierarchy is essential)`;
+## OUTPUT SPECIFICATION - YOU MUST RESPOND ONLY WITH VALID JSON
+
+Your response MUST be a valid JSON object with this exact structure:
+{
+  "article": {
+    "title": "Article title (max 68 chars)",
+    "markdownContent": "650-920 words with ## and ### headers",
+    "excerpt": "Meta description (max 155 chars)",
+    "slug": "url-friendly-slug"
+  },
+  "socialKit": {
+    "xThread": [
+      {"order": 1, "content": "Hook tweet (max 280 chars)"},
+      {"order": 2, "content": "Technical breakdown (max 280 chars)"},
+      {"order": 3, "content": "Continuation (max 280 chars)"},
+      {"order": 4, "content": "Deep dive (max 280 chars)"},
+      {"order": 5, "content": "Call to action (max 280 chars)"}
+    ],
+    "linkedInPost": {
+      "content": "Professional opening (500-800 chars)",
+      "bullets": ["Point 1", "Point 2", "Point 3", "Point 4"]
+    }
+  },
+  "metadataGEO": {
+    "jsonLD": {
+      "@context": "https://schema.org/",
+      "@type": "TechArticle",
+      "headline": "Article headline",
+      "description": "Article excerpt",
+      "keywords": ["tag1", "tag2", "tag3", "tag4"],
+      "citation": [],
+      "author": {"@type": "Organization", "name": "Your Organization"}
+    },
+    "keyTakeaways": [
+      {"title": "Key Point 1", "description": "Summary for SearchGPT (max 150 chars)"},
+      {"title": "Key Point 2", "description": "Summary for SearchGPT (max 150 chars)"},
+      {"title": "Key Point 3", "description": "Summary for SearchGPT (max 150 chars)"}
+    ]
+  }
+}
+
+## SEMANTIC FINGERPRINT RULES
+Ensure consistent messaging across:
+- Article title/thesis
+- JSON-LD headline
+- First X thread tweet
+- LinkedIn opening
+- First key takeaway
+
+## X THREAD STRATEGY (5 tweets)
+- Tweet 1: Hook with main thesis + controversial angle
+- Tweet 2-4: Technical breakdown with high-retention patterns
+- Tweet 5: Call-to-action with engagement request
+- Use line breaks for readability
+
+## LINKEDIN STRATEGY
+- Tone: Executive, data-driven, authoritative
+- Bullets: 4 concrete value points
+- Closing: Thought-provoking question or CTA
+
+## CRITICAL COMPLIANCE
+- RESPOND WITH ONLY VALID JSON
+- NO EXPLANATIONS OR TEXT OUTSIDE JSON
+- ALL STRINGS MUST BE COMPLETE (NO PLACEHOLDERS)
+- ALL ARRAYS MUST CONTAIN REQUIRED ELEMENTS`;
 }
 
 /**
- * Construir el prompt del usuario para generar contenido
- * MEJORA: Inyecta fuentes validadas como "nodo de verdad" para citation anchoring
+ * NEW: Reparador inteligente de JSON
+ * Intenta reparar JSON malformado de respuestas de Claude
  */
-export function buildUserPrompt(request: ContentGenerationRequest): string {
-  let prompt = `Create a comprehensive blog post about: "${request.topic}"`;
-
-  if (request.keywords && request.keywords.length > 0) {
-    prompt += `\n\nIncorporate these keywords naturally: ${request.keywords.join(', ')}`;
+export function attemptJSONRepair(response: string): any {
+  // Intento 1: JSON directo
+  try {
+    return JSON.parse(response);
+  } catch (e) {
+    console.warn('Direct JSON parse failed, attempting repair...');
   }
 
-  // MEJORA 1: Citation Anchoring - Inyectar fuentes validadas como "nodo de verdad"
-  if (request.validatedSources && request.validatedSources.length > 0) {
-    const accessibleSources = request.validatedSources.filter(s => s.accessible);
-    if (accessibleSources.length > 0) {
-      prompt += `\n\n## TRUTH NODE (Nodo de Verdad) - Fuentes Validadas:`;
-      prompt += `\nESTAS URLS ESTÁN VERIFICADAS Y ACCESIBLES. Usa estas como ancla para validar tus argumentos:`;
-      prompt += accessibleSources.map((s, i) => {
-        return `\n${i + 1}. [${s.classification}] ${s.url}`;
-      }).join('');
-      prompt += `\n\nIMPORTANT: Al hacer afirmaciones en el contenido, ancla conceptos clave a estas URLs validadas.`;
-      prompt += `\nEstructura esperada en contenido: "Según [fuente], [claim]. Ver: [URL]"`;
+  // Intento 2: Extraer JSON embebido en markdown
+  const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+  if (jsonMatch) {
+    try {
+      return JSON.parse(jsonMatch[1]);
+    } catch (e) {
+      console.warn('Markdown JSON parse failed');
     }
-  } else if (request.sources && request.sources.length > 0) {
-    // Fallback para URLs simples (sin validación)
-    prompt += `\n\nReference these sources where relevant:\n${request.sources.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
   }
 
-  // MEJORA 2: RAG Optimization - Instruir explícitamente estructura
-  prompt += `\n\n## RAG-OPTIMIZED STRUCTURE (Para indexadores AI):
-- Use EXACTLY 3-4 H2 headers for main sections
-- Follow each H2 with 2-3 keyword-dense sentences
-- Use H3 for subsections within each H2
-- Maintain 100-150 words per section
-- This structure ensures ChatGPT, Perplexity, and Claude RAG systems can parse and index correctly`;
+  // Intento 3: Extraer primer { ... } válido
+  let braceCount = 0;
+  let startIdx = -1;
+  for (let i = 0; i < response.length; i++) {
+    if (response[i] === '{') {
+      if (startIdx === -1) startIdx = i;
+      braceCount++;
+    } else if (response[i] === '}') {
+      braceCount--;
+      if (braceCount === 0 && startIdx !== -1) {
+        const potential = response.substring(startIdx, i + 1);
+        try {
+          return JSON.parse(potential);
+        } catch (e) {
+          console.warn('Extracted JSON parse failed');
+        }
+      }
+    }
+  }
 
-  prompt += `\n\nReturn the response in this exact JSON format:
-{
-  "title": "Post title (max 68 chars)",
-  "metaDescription": "Meta description (max 155 chars, includes CTA)",
-  "intro": "2-3 paragraph introduction",
-  "body": "Main content with H2/H3 headers, 650-920 words, structured for RAG systems",
-  "conclusion": "1-2 paragraph conclusion with CTA",
-  "tags": "tag1, tag2, tag3, tag4, tag5",
-  "imagePrompt": "Single line English description for image generation"
-}`;
+  throw new Error('Could not repair JSON from response');
+}
 
-  return prompt;
+/**
+ * NEW: Parsear y validar salida multidimensional de Claude
+ */
+export function parseMultidimensionalOutput(response: string): MultidimensionalArticle {
+  try {
+    const data = attemptJSONRepair(response);
+
+    // Validar estructura básica
+    if (!data.article || !data.socialKit || !data.metadataGEO) {
+      throw new Error('Missing required top-level keys: article, socialKit, metadataGEO');
+    }
+
+    // Validar article
+    const article = data.article;
+    if (!article.title || !article.markdownContent || !article.excerpt) {
+      throw new Error('Article missing required fields: title, markdownContent, excerpt');
+    }
+
+    if (article.title.length > 68) {
+      article.title = article.title.substring(0, 68);
+    }
+    if (article.excerpt.length > 155) {
+      article.excerpt = article.excerpt.substring(0, 155);
+    }
+    if (!article.slug) {
+      article.slug = article.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+
+    // Validar socialKit
+    const socialKit = data.socialKit;
+    if (!socialKit.xThread || !Array.isArray(socialKit.xThread) || socialKit.xThread.length < 5) {
+      throw new Error('xThread must be an array with at least 5 tweets');
+    }
+
+    // Limitar tweets a 280 chars
+    socialKit.xThread = socialKit.xThread.slice(0, 7).map((t: any, idx: number) => ({
+      order: idx + 1,
+      content: (t.content || '').substring(0, 280),
+    }));
+
+    if (!socialKit.linkedInPost || !socialKit.linkedInPost.content || !Array.isArray(socialKit.linkedInPost.bullets)) {
+      throw new Error('linkedInPost must have content and bullets array');
+    }
+
+    socialKit.linkedInPost.bullets = socialKit.linkedInPost.bullets.slice(0, 5);
+
+    // Validar metadataGEO
+    const metadata = data.metadataGEO;
+    if (!metadata.jsonLD || !metadata.keyTakeaways || !Array.isArray(metadata.keyTakeaways)) {
+      throw new Error('metadataGEO must have jsonLD and keyTakeaways array');
+    }
+
+    metadata.keyTakeaways = metadata.keyTakeaways.slice(0, 5).map((kt: any) => ({
+      title: (kt.title || '').substring(0, 100),
+      description: (kt.description || '').substring(0, 150),
+    }));
+
+    // Validar jsonLD
+    const jsonLD = metadata.jsonLD;
+    if (!jsonLD['@context'] || !jsonLD['@type'] || !jsonLD.headline) {
+      throw new Error('jsonLD missing required fields: @context, @type, headline');
+    }
+
+    jsonLD.keywords = (jsonLD.keywords || []).slice(0, 10);
+    jsonLD.citation = (jsonLD.citation || []).filter((c: string) => typeof c === 'string');
+
+    return data as MultidimensionalArticle;
+  } catch (error) {
+    throw new Error(`Failed to parse multidimensional output: ${error}`);
+  }
+}
+
+/**
+ * NEW: Generar slug URL-friendly
+ */
+export function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .substring(0, 100);
+}
+
+/**
+ * NEW: Construir el prompt del usuario para generar contenido multidimensional
+ * Inyecta fuentes validadas y solicita salida JSON estructurada
+ */
+export function buildUserPrompt(request: ContentGenerationRequest, validatedSources?: ValidatedSource[]): string {
+  const citationContext = validatedSources && validatedSources.length > 0
+    ? `\n\nVALIDATED SOURCES TO CITE:\n${validatedSources.map((s, i) => `${i + 1}. ${s.url} (Classification: ${s.classification})`).join('\n')}`
+    : '';
+
+  return `Create a multidimensional content asset for the topic: "${request.topic}"
+
+## Content Requirements:
+- Focus Area: ${request.keywords?.join(', ') || 'General expertise'}
+- Style: ${request.style || 'persuasive'}
+- Strategy: ${request.authorityStrategy || 'data-driven'}
+- Target: Thought leaders, C-suite executives, and AI systems${citationContext}
+
+## Deliverables:
+1. **Article**: 650-920 words with compelling structure
+2. **X Thread**: 5-7 tweets with high engagement patterns
+3. **LinkedIn Post**: Executive-level insights with 4 value bullets
+4. **JSON-LD Schema**: Technical metadata for search indexing
+5. **Key Takeaways**: 3 atomic statements for AI snippet generation
+
+## Success Criteria:
+- Same semantic fingerprint across all formats
+- Article citations match provided validated sources
+- Social content is natively optimized for platform algorithms
+- JSON-LD is valid Schema.org TechArticle format
+- Key takeaways are distinct from article body
+
+Generate the complete JSON now.`;
 }
 
 /**
@@ -236,7 +436,7 @@ export function validateParsedPost(post: ParsedPost): { valid: boolean; errors: 
   } else if (post.body.length < 650) {
     errors.push(`Body is below recommended length (${post.body.length}/650 words minimum)`);
   } else if (post.body.length > 1500) {
-    errors.push(`Body too long (${post.body.length}/920 words maximum)`);
+    errors.push(`Body too long (${post.body.length}/2000 words maximum)`);
   }
 
   if (!post.tags || post.tags.length === 0) {
@@ -249,8 +449,8 @@ export function validateParsedPost(post: ParsedPost): { valid: boolean; errors: 
 
   if (!post.imagePrompt || post.imagePrompt.length === 0) {
     errors.push('Image prompt is required');
-  } else if (post.imagePrompt.length > 200) {
-    errors.push(`Image prompt too long (${post.imagePrompt.length}/200 chars)`);
+  } else if (post.imagePrompt.length > 300) {
+    errors.push(`Image prompt too long (${post.imagePrompt.length}/300 chars)`);
   }
 
   return {
@@ -338,6 +538,6 @@ export function countWords(text: string): number {
  */
 export function getWordCountCategory(wordCount: number): 'short' | 'good' | 'long' {
   if (wordCount < 650) return 'short';
-  if (wordCount > 920) return 'long';
+  if (wordCount > 2000) return 'long';
   return 'good';
 }

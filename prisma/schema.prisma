@@ -62,6 +62,8 @@ model Project {
   name              String
   description       String?
   authorityStrategy String   @default("data-driven")
+  authorityPersona  String?  // Nueva: Persona de autoridad del nicho
+  promptBase        String?  // Nueva: Prompt base para generación
   status            String   @default("active")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -69,8 +71,22 @@ model Project {
   tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   posts             Post[]
   wordPressSites    WordPressSite[]
+  categories        Category[] // Nueva relación
 
   @@index([tenantId])
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  rules       Json     // Reglas de clasificación: { domains: [], keywords: [], contentTypes: [] }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model WordPressSite {
@@ -121,7 +137,7 @@ model Post {
   tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   wordPressSite     WordPressSite? @relation(fields: [wordPressSiteId], references: [id], onDelete: SetNull)
-  embedding         PostEmbedding?
+  // embedding         PostEmbedding? // Temporalmente comentado - requiere pgvector
   sources           Source[]
   jobs              Job[]
 
@@ -131,16 +147,20 @@ model Post {
   @@index([wordPressSiteId])
 }
 
-model PostEmbedding {
-  id        String   @id @default(uuid())
-  postId    String   @unique
-  embedding Unsupported("vector(1536)")?
-  createdAt DateTime @default(now())
+// ============================================================================
+// EMBEDDINGS (COMENTADO TEMPORALMENTE - requiere pgvector)
+// ============================================================================
 
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+// model PostEmbedding {
+//   id        String @id @default(uuid())
+//   postId    String @unique
+//   embedding Unsupported("vector(1536)")?
+//   createdAt DateTime @default(now())
 
-  @@index([postId])
-}
+//   post      Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+//   @@index([postId])
+// }
 
 model Source {
   id          String   @id @default(uuid())

@@ -6,21 +6,29 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "postinstall": "prisma generate",
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
-    "start": "npm run migrate && node dist/index.js",
-    "dev": "tsx watch src/index.ts"
+    "seed": "tsx prisma/seed.ts",
+    "start": "node dist/index.js",
+    "dev": "npm run build && node dist/index.js",
+    "dev:frontend": "vite",
+    "dev:full": "concurrently \"npm run dev\" \"npm run dev:frontend\""
   },
   "author": "Albert",
   "license": "MIT",
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@prisma/client": "^5.8.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "axios": "^1.15.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsdom": "^29.0.2",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "redis": "^4.6.5",
     "uuid": "^9.0.0"
   },
@@ -31,9 +39,12 @@
     "@types/node": "^20.10.6",
     "@types/redis": "^4.0.10",
     "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
     "prisma": "^5.8.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vite": "^8.0.8"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -3,12 +3,14 @@
  * Funcionalidad que reemplaza CORS-Anywhere en el frontend
  */
 
+import prisma from './config/prisma.js';
+
 export interface ValidatedSource {
   url: string;
   status: number;
   contentType: string;
   accessible: boolean;
-  classification: 'paper' | 'research_article' | 'official_source' | 'blog' | 'unknown';
+  classification: string; // Cambiado de union type a string dinámico
   domain: string;
   title?: string;
   error?: string;
@@ -17,7 +19,7 @@ export interface ValidatedSource {
 /**
  * Validar una URL y obtener información sobre la fuente
  */
-export async function validateSource(url: string): Promise<ValidatedSource> {
+export async function validateSource(url: string, projectId: string): Promise<ValidatedSource> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -43,7 +45,7 @@ export async function validateSource(url: string): Promise<ValidatedSource> {
     const accessible = status >= 200 && status < 400;
 
     // Clasificar la fuente basado en dominio y Content-Type
-    const classification = classifySource(domain, url, contentType);
+    const classification = await classifySource(domain, url, contentType, projectId);
 
     return {
       url,
@@ -70,14 +72,14 @@ export async function validateSource(url: string): Promise<ValidatedSource> {
 /**
  * Validar múltiples URLs en paralelo
  */
-export async function validateSources(urls: string[]): Promise<ValidatedSource[]> {
+export async function validateSources(urls: string[], projectId: string): Promise<ValidatedSource[]> {
   // Limitar concurrencia a 5 solicitudes simultáneas
   const results: ValidatedSource[] = [];
   const batchSize = 5;
 
   for (let i = 0; i < urls.length; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
-    const batchResults = await Promise.all(batch.map(url => validateSource(url)));
+    const batchResults = await Promise.all(batch.map(url => validateSource(url, projectId)));
     results.push(...batchResults);
   }
 
@@ -85,50 +87,36 @@ export async function validateSources(urls: string[]): Promise<ValidatedSource[]
 }
 
 /**
- * Clasificar una fuente basado en dominio y características
+ * Clasificar una fuente basado en dominio y características, cargando reglas dinámicamente desde DB
  */
-function classifySource(domain: string, url: string, contentType: string): ValidatedSource['classification'] {
-  // Dominios académicos/research
-  const researchDomains = [
-    'arxiv.org',
-    'doi.org',
-    'scholar.google.com',
-    'researchgate.net',
-    'academia.edu',
-    'pubmed.ncbi.nlm.nih.gov',
-    'jstor.org',
-    'ieee.org',
-    'acm.org',
-  ];
+async function classifySource(domain: string, url: string, contentType: string, projectId: string): Promise<string> {
+  // Cargar categorías del proyecto desde DB
+  const categories = await prisma.category.findMany({
+    where: { projectId },
+  });
 
-  // Dominios de autoridad oficial
-  const officialDomains = [
-    'gov',
-    'edu',
-    'org',
-    '.ac.',
-    'wikipedia.org',
-    'britannica.com',
-  ];
+  // Verificar cada categoría
+  for (const category of categories) {
+    const rules = category.rules as {
+      domains?: string[];
+      keywords?: string[];
+      contentTypes?: string[];
+    };
 
-  // Papers indicators en URL
-  if (url.toLowerCase().includes('pdf') || url.toLowerCase().includes('paper')) {
-    return 'paper';
-  }
+    // Verificar domains
+    if (rules.domains && rules.domains.some(d => domain.includes(d))) {
+      return category.name;
+    }
 
-  // Research domains
-  if (researchDomains.some(d => domain.includes(d))) {
-    return 'research_article';
-  }
+    // Verificar keywords en URL
+    if (rules.keywords && rules.keywords.some(k => url.toLowerCase().includes(k.toLowerCase()))) {
+      return category.name;
+    }
 
-  // Official sources
-  if (officialDomains.some(d => domain.includes(d))) {
-    return 'official_source';
-  }
-
-  // Blog/article sites
-  if (domain.includes('blog') || domain.includes('medium.com') || domain.includes('substack.com')) {
-    return 'blog';
+    // Verificar contentTypes
+    if (rules.contentTypes && rules.contentTypes.some(ct => contentType.includes(ct))) {
+      return category.name;
+    }
   }
 
   // Default

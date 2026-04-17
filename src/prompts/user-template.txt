@@ -1,0 +1,18 @@
+Escribe un artículo profesional sobre: {{TOPIC}}
+
+CONTEXTO ESTRATÉGICO:
+- Estilo de redacción: {{STYLE}}
+- Estrategia de autoridad: {{AUTHORITY_STRATEGY}}
+- Palabras clave objetivo: {{KEYWORDS}}
+
+FUENTES A REFERENCIAR:
+{{SOURCES}}
+
+Crea un artículo que:
+1. Establezca autoridad mediante datos y análisis
+2. Proporcione información valiosa y accionable
+3. Esté bien estructurado para SEO (H2/H3)
+4. Sea fácil de leer y entender
+5. Incluya evidencia de las fuentes proporcionadas
+
+Responde SOLO con el JSON válido, sin explicaciones adicionales.
